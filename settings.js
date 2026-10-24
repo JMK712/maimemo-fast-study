@@ -1,6 +1,7 @@
 globalThis.MAIMEMO_DEFAULTS = Object.freeze({
   enabled: true,
   autoStart: true,
+  autoSign: true,
   autoLogin: true,
   returnAfterLogin: true,
   fillPage: true,
