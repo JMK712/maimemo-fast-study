@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>墨墨学习直达设置</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <header>
+    <h1>墨墨学习直达</h1>
+    <p>只作用于墨墨网页版学习</p>
+  </header>
+  <main>
+    <label class="row primary"><span>启用扩展</span><input type="checkbox" data-setting="enabled"></label>
+    <section>
+      <h2>自动进入</h2>
+      <label class="row"><span>自动勾选须知并开始学习</span><input type="checkbox" data-setting="autoStart"></label>
+      <label class="row"><span>Chrome 填好账号密码后自动登录</span><input type="checkbox" data-setting="autoLogin"></label>
+      <label class="row"><span>登录成功后返回学习页</span><input type="checkbox" data-setting="returnAfterLogin"></label>
+      <label class="row"><span>登录信息稳定等待</span>
+        <select data-setting="settleMs">
+          <option value="0">立即</option>
+          <option value="250">0.25 秒</option>
+          <option value="500">0.5 秒</option>
+          <option value="1000">1 秒</option>
+        </select>
+      </label>
+    </section>
+    <section>
+      <h2>显示</h2>
+      <label class="row"><span>学习内容铺满标签页</span><input type="checkbox" data-setting="fillPage"></label>
+      <label class="row"><span>进入学习后浏览器全屏</span><input type="checkbox" data-setting="browserFullscreen"></label>
+      <p class="hint">浏览器全屏效果相当于 F11；再次按 F11 可退出。</p>
+    </section>
+    <div class="actions">
+      <button id="openStudy" type="button">打开学习页</button>
+      <button id="reset" type="button">恢复默认</button>
+    </div>
+    <p id="status" role="status" aria-live="polite"></p>
+  </main>
+  <script src="settings.js"></script>
+  <script src="popup.js"></script>
+</body>
+</html>

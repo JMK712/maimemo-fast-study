@@ -1,0 +1,27 @@
+{
+  "manifest_version": 3,
+  "name": "墨墨学习直达",
+  "version": "1.1.0",
+  "description": "自动进入墨墨网页版学习，优化登录与全屏显示。",
+  "permissions": ["storage"],
+  "action": {
+    "default_title": "墨墨学习直达设置",
+    "default_popup": "popup.html"
+  },
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://www.maimemo.com/*"],
+      "js": ["settings.js", "site.js"],
+      "run_at": "document_start"
+    },
+    {
+      "matches": ["https://tc-apis.maimemo.com/webstudy/app*"],
+      "js": ["settings.js", "study.js"],
+      "run_at": "document_idle",
+      "all_frames": true
+    }
+  ]
+}
