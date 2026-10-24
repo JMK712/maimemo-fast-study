@@ -9,6 +9,7 @@ import json
 import os
 import sys
 import threading
+import time
 import wave
 from functools import lru_cache
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -25,10 +26,43 @@ _model_lock = threading.Lock()
 _prefetch_state = threading.Condition()
 _prefetch_generation = 0
 _interactive_waiters = 0
+_prefetch_signature = None
+_prefetch_texts = ()
+_prefetch_second_played = False
+_prefetch_third_played = False
+_third_use_score = 0.25
+_inflight = {}
+_inflight_lock = threading.Lock()
 
 
 @lru_cache(maxsize=96)
 def synthesize(text: str, voice: str, rate: float) -> str:
+    key = (text, voice, rate)
+    with _inflight_lock:
+        flight = _inflight.get(key)
+        leader = flight is None
+        if leader:
+            flight = {'event': threading.Event(), 'result': None, 'error': None}
+            _inflight[key] = flight
+    if not leader:
+        flight['event'].wait()
+        if flight['error'] is not None:
+            raise flight['error']
+        return flight['result']
+    try:
+        audio = render_audio(text, voice, rate)
+        flight['result'] = audio
+        return audio
+    except BaseException as error:
+        flight['error'] = error
+        raise
+    finally:
+        with _inflight_lock:
+            _inflight.pop(key, None)
+            flight['event'].set()
+
+
+def render_audio(text: str, voice: str, rate: float) -> str:
     import numpy as np
 
     with _model_lock:
@@ -54,8 +88,15 @@ def get_model_unlocked():
 
 
 def prefetch_sentences(texts: list[str], voice: str, rate: float, generation: int):
-    for text in texts:
+    for index, text in enumerate(texts):
         with _prefetch_state:
+            if index == 2 and _third_use_score < 0.5:
+                ready_at = time.monotonic() + 8
+                while generation == _prefetch_generation and not _prefetch_second_played:
+                    remaining = ready_at - time.monotonic()
+                    if remaining <= 0:
+                        break
+                    _prefetch_state.wait(timeout=remaining)
             while _interactive_waiters and generation == _prefetch_generation:
                 _prefetch_state.wait(timeout=0.25)
             if generation != _prefetch_generation:
@@ -94,7 +135,8 @@ class Handler(BaseHTTPRequestHandler):
         return bool(expected) and hmac.compare_digest(expected, supplied)
 
     def do_POST(self):
-        global _prefetch_generation, _interactive_waiters
+        global _prefetch_generation, _interactive_waiters, _prefetch_signature
+        global _prefetch_texts, _prefetch_second_played, _prefetch_third_played, _third_use_score
         if self.path not in ('/v1/speech', '/v1/prefetch'):
             self._reply(404, {'error': 'Not found'})
             return
@@ -118,10 +160,20 @@ class Handler(BaseHTTPRequestHandler):
                 ):
                     raise ValueError('Invalid prefetch texts')
                 with _prefetch_state:
-                    _prefetch_generation += 1
-                    generation = _prefetch_generation
-                    _prefetch_state.notify_all()
-                threading.Thread(target=prefetch_sentences, args=(texts, voice, rate, generation), daemon=True).start()
+                    signature = (tuple(texts), voice, rate)
+                    duplicate = signature == _prefetch_signature
+                    if not duplicate:
+                        if len(_prefetch_texts) >= 3:
+                            _third_use_score = 0.75 * _third_use_score + 0.25 * int(_prefetch_third_played)
+                        _prefetch_signature = signature
+                        _prefetch_texts = tuple(texts)
+                        _prefetch_second_played = False
+                        _prefetch_third_played = False
+                        _prefetch_generation += 1
+                        generation = _prefetch_generation
+                        _prefetch_state.notify_all()
+                if not duplicate:
+                    threading.Thread(target=prefetch_sentences, args=(texts, voice, rate, generation), daemon=True).start()
                 self._reply(202, {'queued': True})
                 return
             text = request['text']
@@ -129,6 +181,12 @@ class Handler(BaseHTTPRequestHandler):
                 raise ValueError('Invalid text')
             with _prefetch_state:
                 _interactive_waiters += 1
+                if _prefetch_signature and (voice, rate) == _prefetch_signature[1:]:
+                    if len(_prefetch_texts) >= 2 and text == _prefetch_texts[1]:
+                        _prefetch_second_played = True
+                    if len(_prefetch_texts) >= 3 and text == _prefetch_texts[2]:
+                        _prefetch_third_played = True
+                    _prefetch_state.notify_all()
             try:
                 audio = synthesize(text, voice, rate)
             finally:

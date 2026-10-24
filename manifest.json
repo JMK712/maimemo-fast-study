@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "墨墨学习直达",
-  "version": "1.4.0",
+  "version": "1.4.1",
   "description": "自动进入墨墨网页版学习，并可使用本机离线发音。",
   "permissions": ["storage"],
   "host_permissions": ["http://127.0.0.1:8765/*"],
