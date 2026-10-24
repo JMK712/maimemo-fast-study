@@ -33,15 +33,19 @@ async function getLocalSecret() {
 }
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  if (message?.type !== 'maimemo-local-tts') return false;
+  const prefetch = message?.type === 'maimemo-local-tts-prefetch';
+  if (!prefetch && message?.type !== 'maimemo-local-tts') return false;
   (async () => {
     const source = new URL(sender.url);
     if (source.origin !== 'https://tc-apis.maimemo.com' ||
         !source.pathname.startsWith('/webstudy/app') || !sender.tab) {
       throw new Error('Request outside MaiMemo study');
     }
-    const { text, voice } = message;
-    if (typeof text !== 'string' || !text.trim() || text.length > 600 ||
+    const { text, voice, texts } = message;
+    if ((prefetch
+          ? !Array.isArray(texts) || texts.length < 1 || texts.length > 3 ||
+            texts.some((item) => typeof item !== 'string' || !item.trim() || item.length > 600)
+          : typeof text !== 'string' || !text.trim() || text.length > 600) ||
         !['af_heart', 'af_bella', 'af_sarah', 'am_michael'].includes(voice)) {
       throw new Error('Invalid speech request');
     }
@@ -52,17 +56,19 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     const stored = await chrome.storage.sync.get('settings');
     const settings = { ...MAIMEMO_DEFAULTS, ...stored.settings };
     if (!settings.enabled || !settings.localTtsEnabled) throw new Error('Local TTS disabled');
+    if (prefetch && !settings.localTtsPrefetch) throw new Error('Prefetch disabled');
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 18000);
     try {
-      const response = await fetch('http://127.0.0.1:8765/v1/speech', {
+      const response = await fetch(`http://127.0.0.1:8765/v1/${prefetch ? 'prefetch' : 'speech'}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'X-MaiMemo-Token': await getLocalSecret() },
-        body: JSON.stringify({ text, voice, rate }),
+        body: JSON.stringify(prefetch ? { texts, voice, rate } : { text, voice, rate }),
         signal: controller.signal
       });
       if (!response.ok) throw new Error(`Local TTS HTTP ${response.status}`);
       const payload = await response.json();
+      if (prefetch) return { ok: payload.queued === true };
       if (!payload.audio || typeof payload.audio !== 'string') throw new Error('Invalid audio response');
       return { ok: true, audio: payload.audio };
     } finally {

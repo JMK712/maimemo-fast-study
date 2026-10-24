@@ -22,6 +22,9 @@ MODEL_FILE = DATA_DIR / 'models/kokoro-v1.0.onnx'
 VOICES_FILE = DATA_DIR / 'models/voices-v1.0.bin'
 _model = None
 _model_lock = threading.Lock()
+_prefetch_state = threading.Condition()
+_prefetch_generation = 0
+_interactive_waiters = 0
 
 
 @lru_cache(maxsize=96)
@@ -48,6 +51,20 @@ def get_model_unlocked():
         from kokoro_onnx import Kokoro
         _model = Kokoro(str(MODEL_FILE), str(VOICES_FILE))
     return _model
+
+
+def prefetch_sentences(texts: list[str], voice: str, rate: float, generation: int):
+    for text in texts:
+        with _prefetch_state:
+            while _interactive_waiters and generation == _prefetch_generation:
+                _prefetch_state.wait(timeout=0.25)
+            if generation != _prefetch_generation:
+                return
+        try:
+            synthesize(text, voice, rate)
+        except Exception as error:
+            print(f'Prefetch skipped: {error}', file=sys.stderr, flush=True)
+            return
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -77,7 +94,8 @@ class Handler(BaseHTTPRequestHandler):
         return bool(expected) and hmac.compare_digest(expected, supplied)
 
     def do_POST(self):
-        if self.path != '/v1/speech':
+        global _prefetch_generation, _interactive_waiters
+        if self.path not in ('/v1/speech', '/v1/prefetch'):
             self._reply(404, {'error': 'Not found'})
             return
         if not self._authorized():
@@ -88,14 +106,35 @@ class Handler(BaseHTTPRequestHandler):
             if not 0 < size <= 4096:
                 raise ValueError('Invalid body size')
             request = json.loads(self.rfile.read(size))
-            text = request['text']
             voice = request['voice']
             rate = request['rate']
-            if not isinstance(text, str) or not text.strip() or len(text) > 600:
-                raise ValueError('Invalid text')
             if voice not in VOICES or isinstance(rate, bool) or not isinstance(rate, (int, float)) or not 0.5 <= rate <= 2:
                 raise ValueError('Invalid voice or rate')
-            audio = synthesize(text, voice, round(float(rate), 2))
+            rate = round(float(rate), 2)
+            if self.path == '/v1/prefetch':
+                texts = request['texts']
+                if not isinstance(texts, list) or not 1 <= len(texts) <= 3 or any(
+                    not isinstance(text, str) or not text.strip() or len(text) > 600 for text in texts
+                ):
+                    raise ValueError('Invalid prefetch texts')
+                with _prefetch_state:
+                    _prefetch_generation += 1
+                    generation = _prefetch_generation
+                    _prefetch_state.notify_all()
+                threading.Thread(target=prefetch_sentences, args=(texts, voice, rate, generation), daemon=True).start()
+                self._reply(202, {'queued': True})
+                return
+            text = request['text']
+            if not isinstance(text, str) or not text.strip() or len(text) > 600:
+                raise ValueError('Invalid text')
+            with _prefetch_state:
+                _interactive_waiters += 1
+            try:
+                audio = synthesize(text, voice, rate)
+            finally:
+                with _prefetch_state:
+                    _interactive_waiters -= 1
+                    _prefetch_state.notify_all()
         except (ValueError, KeyError, TypeError, json.JSONDecodeError) as error:
             self._reply(400, {'error': str(error)})
             return

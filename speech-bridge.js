@@ -1,10 +1,13 @@
 (() => {
   'use strict';
-  let settings = { enabled: true, localTtsEnabled: true, localTtsVoice: 'af_heart', localTtsSpeed: 1 };
+  let settings = { enabled: true, localTtsEnabled: true, localTtsPrefetch: true, localTtsVoice: 'af_heart', localTtsSpeed: 1 };
 
   function publishConfig() {
     document.dispatchEvent(new CustomEvent('maimemo-tts-config', {
-      detail: { enabled: Boolean(settings.enabled && settings.localTtsEnabled) }
+      detail: {
+        enabled: Boolean(settings.enabled && settings.localTtsEnabled),
+        prefetch: Boolean(settings.enabled && settings.localTtsEnabled && settings.localTtsPrefetch)
+      }
     }));
   }
 
@@ -37,5 +40,16 @@
     }).catch(() => {
       document.dispatchEvent(new CustomEvent('maimemo-tts-response', { detail: { id } }));
     });
+  });
+
+  document.addEventListener('maimemo-tts-prefetch', (event) => {
+    if (!settings.enabled || !settings.localTtsEnabled || !settings.localTtsPrefetch) return;
+    const { texts, rate } = event.detail || {};
+    if (!Array.isArray(texts) || texts.length > 3 || !texts.length) return;
+    chrome.runtime.sendMessage({
+      type: 'maimemo-local-tts-prefetch', texts, rate,
+      voice: settings.localTtsVoice,
+      multiplier: settings.localTtsSpeed
+    }).catch(() => {});
   });
 })();

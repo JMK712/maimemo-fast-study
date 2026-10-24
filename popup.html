@@ -30,6 +30,7 @@
     <section>
       <h2>离线发音</h2>
       <label class="row"><span>使用本机 Kokoro 发音</span><input type="checkbox" data-setting="localTtsEnabled"></label>
+      <label class="row"><span>提前缓存当前单词的三条例句</span><input type="checkbox" data-setting="localTtsPrefetch"></label>
       <label class="row"><span>英文声音</span>
         <select data-setting="localTtsVoice">
           <option value="af_heart">Heart（女声）</option>
@@ -48,7 +49,7 @@
           <option value="1.5">1.5×</option>
         </select>
       </label>
-      <p class="hint">首次发音才加载本机模型；服务未启动时自动使用网页原发音。语速倍率会乘以墨墨自己的语速设置。</p>
+      <p class="hint">开启预缓存后，单词卡出现时开始合成例句；关闭后首次发音才加载模型。服务未启动时自动使用网页原发音。语速倍率会乘以墨墨自己的语速设置。</p>
     </section>
     <section>
       <h2>显示</h2>

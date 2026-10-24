@@ -7,6 +7,7 @@ globalThis.MAIMEMO_DEFAULTS = Object.freeze({
   browserFullscreen: true,
   settleMs: 250,
   localTtsEnabled: true,
+  localTtsPrefetch: true,
   localTtsVoice: 'af_heart',
   localTtsSpeed: 1
 });

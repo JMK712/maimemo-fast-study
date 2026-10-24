@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "墨墨学习直达",
-  "version": "1.2.0",
+  "version": "1.3.0",
   "description": "自动进入墨墨网页版学习，并可使用本机离线发音。",
   "permissions": ["storage"],
   "host_permissions": ["http://127.0.0.1:8765/*"],
@@ -20,7 +20,7 @@
     },
     {
       "matches": ["https://tc-apis.maimemo.com/webstudy/app*"],
-      "js": ["speech-main.js"],
+      "js": ["speech-main.js", "speech-prefetch-main.js"],
       "world": "MAIN",
       "run_at": "document_start",
       "all_frames": true
