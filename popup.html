@@ -28,6 +28,29 @@
       </label>
     </section>
     <section>
+      <h2>离线发音</h2>
+      <label class="row"><span>使用本机 Kokoro 发音</span><input type="checkbox" data-setting="localTtsEnabled"></label>
+      <label class="row"><span>英文声音</span>
+        <select data-setting="localTtsVoice">
+          <option value="af_heart">Heart（女声）</option>
+          <option value="af_bella">Bella（女声）</option>
+          <option value="af_sarah">Sarah（女声）</option>
+          <option value="am_michael">Michael（男声）</option>
+        </select>
+      </label>
+      <label class="row"><span>语速倍率</span>
+        <select data-setting="localTtsSpeed">
+          <option value="0.75">0.75×</option>
+          <option value="0.9">0.9×</option>
+          <option value="1">1×</option>
+          <option value="1.1">1.1×</option>
+          <option value="1.25">1.25×</option>
+          <option value="1.5">1.5×</option>
+        </select>
+      </label>
+      <p class="hint">首次发音才加载本机模型；服务未启动时自动使用网页原发音。语速倍率会乘以墨墨自己的语速设置。</p>
+    </section>
+    <section>
       <h2>显示</h2>
       <label class="row"><span>学习内容铺满标签页</span><input type="checkbox" data-setting="fillPage"></label>
       <label class="row"><span>进入学习后浏览器全屏</span><input type="checkbox" data-setting="browserFullscreen"></label>

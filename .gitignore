@@ -1,0 +1,4 @@
+local-secret.json
+*.download
+__pycache__/
+*.pyc

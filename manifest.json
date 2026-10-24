@@ -1,9 +1,10 @@
 {
   "manifest_version": 3,
   "name": "墨墨学习直达",
-  "version": "1.1.0",
-  "description": "自动进入墨墨网页版学习，优化登录与全屏显示。",
+  "version": "1.2.0",
+  "description": "自动进入墨墨网页版学习，并可使用本机离线发音。",
   "permissions": ["storage"],
+  "host_permissions": ["http://127.0.0.1:8765/*"],
   "action": {
     "default_title": "墨墨学习直达设置",
     "default_popup": "popup.html"
@@ -16,6 +17,19 @@
       "matches": ["https://www.maimemo.com/*"],
       "js": ["settings.js", "site.js"],
       "run_at": "document_start"
+    },
+    {
+      "matches": ["https://tc-apis.maimemo.com/webstudy/app*"],
+      "js": ["speech-main.js"],
+      "world": "MAIN",
+      "run_at": "document_start",
+      "all_frames": true
+    },
+    {
+      "matches": ["https://tc-apis.maimemo.com/webstudy/app*"],
+      "js": ["speech-bridge.js"],
+      "run_at": "document_start",
+      "all_frames": true
     },
     {
       "matches": ["https://tc-apis.maimemo.com/webstudy/app*"],

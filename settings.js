@@ -5,5 +5,8 @@ globalThis.MAIMEMO_DEFAULTS = Object.freeze({
   returnAfterLogin: true,
   fillPage: true,
   browserFullscreen: true,
-  settleMs: 250
+  settleMs: 250,
+  localTtsEnabled: true,
+  localTtsVoice: 'af_heart',
+  localTtsSpeed: 1
 });
