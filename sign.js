@@ -15,10 +15,13 @@
 
   function signButton() {
     return [...document.querySelectorAll('.finished-status .taroify-button')]
-      .find((button) =>
-        button.querySelector('.taroify-button__text')?.textContent.trim() === '签到' &&
-        !button.classList.contains('taroify-button--disabled') &&
-        !button.querySelector('taro-button-core[disabled]') && visible(button));
+      .find((button) => {
+        const core = button.querySelector('taro-button-core');
+        const disabled = core?.getAttribute('disabled');
+        return button.querySelector('.taroify-button__text')?.textContent.trim() === '签到' &&
+          !button.classList.contains('taroify-button--disabled') &&
+          (disabled === null || disabled === 'false') && visible(button);
+      });
   }
 
   function resultDialog() {
