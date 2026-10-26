@@ -42,6 +42,36 @@ async function getLocalSecret() {
   return localSecret;
 }
 
+function cacheSettings(settings) {
+  return {
+    cacheEntries: settings.localTtsCacheEntries,
+    cacheMinutes: settings.localTtsCacheMinutes,
+    idleMinutes: settings.localTtsIdleMinutes
+  };
+}
+
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  if (message?.type !== 'maimemo-local-tts-cache') return false;
+  if (sender.id !== chrome.runtime.id || sender.url !== chrome.runtime.getURL('popup.html')) return false;
+  (async () => {
+    const stored = await chrome.storage.sync.get('settings');
+    const settings = { ...MAIMEMO_DEFAULTS, ...stored.settings };
+    const action = message.action;
+    if (!['stats', 'clear', 'configure'].includes(action)) throw new Error('Invalid cache action');
+    const response = await fetch('http://127.0.0.1:8765/v1/cache', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-MaiMemo-Token': await getLocalSecret() },
+      body: JSON.stringify({ action, ...cacheSettings(settings) })
+    });
+    if (!response.ok) throw new Error(`Local TTS HTTP ${response.status}`);
+    return { ok: true, ...await response.json() };
+  })().then(sendResponse).catch((error) => {
+    if (error instanceof TypeError) sendResponse({ ok: true, offline: true, entries: 0, bytes: 0 });
+    else sendResponse({ ok: false, error: String(error) });
+  });
+  return true;
+});
+
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   const prefetch = message?.type === 'maimemo-local-tts-prefetch';
   if (!prefetch && message?.type !== 'maimemo-local-tts') return false;
@@ -74,7 +104,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       const options = {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'X-MaiMemo-Token': await getLocalSecret() },
-        body: JSON.stringify(prefetch ? { texts, voice, rate } : { text, voice, rate }),
+        body: JSON.stringify({ ...(prefetch ? { texts, voice, rate } : { text, voice, rate }), ...cacheSettings(settings) }),
         signal: controller.signal
       };
       let response;

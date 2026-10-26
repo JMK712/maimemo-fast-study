@@ -50,7 +50,27 @@
           <option value="1.5">1.5×</option>
         </select>
       </label>
-      <p class="hint">开启预缓存后，单词卡出现时开始合成例句；关闭后首次发音才加载模型。服务未启动时自动使用网页原发音。语速倍率会乘以墨墨自己的语速设置。</p>
+      <label class="row"><span>缓存容量</span>
+        <select data-setting="localTtsCacheEntries">
+          <option value="0">不保留</option><option value="24">24 条</option><option value="48">48 条</option>
+          <option value="96">96 条</option><option value="192">192 条</option>
+        </select>
+      </label>
+      <label class="row"><span>缓存过期时间</span>
+        <select data-setting="localTtsCacheMinutes">
+          <option value="5">5 分钟</option><option value="15">15 分钟</option>
+          <option value="30">30 分钟</option><option value="60">60 分钟</option>
+        </select>
+      </label>
+      <label class="row"><span>服务空闲后退出</span>
+        <select data-setting="localTtsIdleMinutes">
+          <option value="1">1 分钟</option><option value="5">5 分钟</option>
+          <option value="15">15 分钟</option><option value="30">30 分钟</option>
+        </select>
+      </label>
+      <div class="cache-actions"><span id="cacheStatus" aria-live="polite">正在读取缓存…</span><button id="clearCache" type="button">清空缓存</button></div>
+      <p class="hint">音频只保存在本机服务内存中，按过期时间和最近使用顺序清理；服务退出后全部清空。清空时会取消尚未开始的预缓存。首次请求会按需唤醒服务。</p>
+      <p class="hint">语速倍率会乘以墨墨自己的语速设置。</p>
     </section>
     <section>
       <h2>显示</h2>

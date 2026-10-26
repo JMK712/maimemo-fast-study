@@ -12,6 +12,7 @@ h2 { margin: 0 0 4px; font-size: 13px; color: #467a67; }
 input[type="checkbox"] { width: 17px; height: 17px; accent-color: #229b71; cursor: pointer; }
 select { border: 1px solid #bfd6c9; border-radius: 5px; padding: 4px; background: white; color: #163b34; }
 .hint { margin: 2px 0 0; color: #6b8178; font-size: 12px; }
+.cache-actions { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin: 8px 0; color: #467a67; font-size: 12px; }
 .actions { display: flex; gap: 8px; margin-top: 15px; }
 button { border: 1px solid #b9d9c8; border-radius: 6px; padding: 7px 10px; background: white; color: #166b51; cursor: pointer; }
 button:first-child { background: #229b71; border-color: #229b71; color: white; }

@@ -11,12 +11,16 @@ import sys
 import threading
 import time
 import wave
-from functools import lru_cache
+from collections import OrderedDict
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 PORT = int(os.environ.get('MAIMEMO_TTS_PORT', '8765'))
 IDLE_SECONDS = int(os.environ.get('MAIMEMO_TTS_IDLE_SECONDS', '300'))
+CACHE_SIZES = frozenset({0, 24, 48, 96, 192})
+MAX_CACHE_BYTES = 64 * 1024 * 1024
+CACHE_MINUTES = frozenset({5, 15, 30, 60})
+IDLE_MINUTES = frozenset({1, 5, 15, 30})
 VOICES = frozenset({'af_heart', 'af_bella', 'af_sarah', 'am_michael'})
 DATA_DIR = Path(os.environ.get('MAIMEMO_TTS_HOME', Path.home() / 'AppData/Local/MaiMemoFastStudy'))
 SECRET_FILE = DATA_DIR / 'secret.txt'
@@ -32,20 +36,81 @@ _prefetch_texts = ()
 _prefetch_second_played = False
 _prefetch_third_played = False
 _third_use_score = 0.25
+_cache = OrderedDict()
+_cache_lock = threading.Lock()
+_cache_max_entries = 96
+_cache_ttl_seconds = 30 * 60
+_cache_epoch = 0
 _inflight = {}
-_inflight_lock = threading.Lock()
 _last_activity = time.monotonic()
 
 
-@lru_cache(maxsize=96)
+def prune_cache(now=None):
+    """Remove expired entries and then the least recently used overflow."""
+    if now is None:
+        now = time.monotonic()
+    with _cache_lock:
+        for key, (_, created) in list(_cache.items()):
+            if now - created >= _cache_ttl_seconds:
+                _cache.pop(key, None)
+        while _cache and (len(_cache) > _cache_max_entries or
+                          sum(len(audio) for audio, _ in _cache.values()) > MAX_CACHE_BYTES):
+            _cache.popitem(last=False)
+
+
+def cache_stats():
+    prune_cache()
+    with _cache_lock:
+        return {'entries': len(_cache), 'bytes': sum(len(audio) for audio, _ in _cache.values())}
+
+
+def configure_cache(request):
+    global _cache_max_entries, _cache_ttl_seconds, IDLE_SECONDS
+    entries = request.get('cacheEntries', _cache_max_entries)
+    minutes = request.get('cacheMinutes', _cache_ttl_seconds // 60)
+    idle = request.get('idleMinutes', IDLE_SECONDS // 60)
+    if type(entries) is not int or entries not in CACHE_SIZES or type(minutes) is not int or minutes not in CACHE_MINUTES or type(idle) is not int or idle not in IDLE_MINUTES:
+        raise ValueError('Invalid cache settings')
+    with _cache_lock:
+        disable_cache = _cache_max_entries != 0 and entries == 0
+        _cache_max_entries = entries
+        _cache_ttl_seconds = minutes * 60
+        IDLE_SECONDS = idle * 60
+    if disable_cache:
+        clear_cache()
+    else:
+        prune_cache()
+
+
+def clear_cache():
+    global _cache_epoch, _prefetch_generation, _prefetch_signature, _prefetch_texts
+    with _cache_lock:
+        _cache_epoch += 1
+        _cache.clear()
+    with _prefetch_state:
+        _prefetch_generation += 1
+        _prefetch_signature = None
+        _prefetch_texts = ()
+        _prefetch_state.notify_all()
+
+
 def synthesize(text: str, voice: str, rate: float) -> str:
     key = (text, voice, rate)
-    with _inflight_lock:
+    with _cache_lock:
+        now = time.monotonic()
+        for old_key, (_, created) in list(_cache.items()):
+            if now - created >= _cache_ttl_seconds:
+                _cache.pop(old_key, None)
+        cached = _cache.get(key)
+        if cached is not None:
+            _cache.move_to_end(key)
+            return cached[0]
         flight = _inflight.get(key)
         leader = flight is None
         if leader:
             flight = {'event': threading.Event(), 'result': None, 'error': None}
             _inflight[key] = flight
+            epoch = _cache_epoch
     if not leader:
         flight['event'].wait()
         if flight['error'] is not None:
@@ -54,12 +119,19 @@ def synthesize(text: str, voice: str, rate: float) -> str:
     try:
         audio = render_audio(text, voice, rate)
         flight['result'] = audio
+        with _cache_lock:
+            if epoch == _cache_epoch and _cache_max_entries:
+                _cache[key] = (audio, time.monotonic())
+                _cache.move_to_end(key)
+                while _cache and (len(_cache) > _cache_max_entries or
+                                  sum(len(item) for item, _ in _cache.values()) > MAX_CACHE_BYTES):
+                    _cache.popitem(last=False)
         return audio
     except BaseException as error:
         flight['error'] = error
         raise
     finally:
-        with _inflight_lock:
+        with _cache_lock:
             _inflight.pop(key, None)
             flight['event'].set()
 
@@ -141,7 +213,7 @@ class Handler(BaseHTTPRequestHandler):
         _last_activity = time.monotonic()
         global _prefetch_generation, _interactive_waiters, _prefetch_signature
         global _prefetch_texts, _prefetch_second_played, _prefetch_third_played, _third_use_score
-        if self.path not in ('/v1/speech', '/v1/prefetch'):
+        if self.path not in ('/v1/speech', '/v1/prefetch', '/v1/cache'):
             self._reply(404, {'error': 'Not found'})
             return
         if not self._authorized():
@@ -152,12 +224,28 @@ class Handler(BaseHTTPRequestHandler):
             if not 0 < size <= 4096:
                 raise ValueError('Invalid body size')
             request = json.loads(self.rfile.read(size))
+            if not isinstance(request, dict):
+                raise ValueError('Invalid body')
+            if self.path == '/v1/cache':
+                action = request.get('action')
+                if action == 'configure':
+                    configure_cache(request)
+                elif action == 'clear':
+                    clear_cache()
+                elif action != 'stats':
+                    raise ValueError('Invalid cache action')
+                self._reply(200, cache_stats())
+                return
+            configure_cache(request)
             voice = request['voice']
             rate = request['rate']
             if voice not in VOICES or isinstance(rate, bool) or not isinstance(rate, (int, float)) or not 0.5 <= rate <= 2:
                 raise ValueError('Invalid voice or rate')
             rate = round(float(rate), 2)
             if self.path == '/v1/prefetch':
+                if _cache_max_entries == 0:
+                    self._reply(202, {'queued': False})
+                    return
                 texts = request['texts']
                 if not isinstance(texts, list) or not 1 <= len(texts) <= 3 or any(
                     not isinstance(text, str) or not text.strip() or len(text) > 600 for text in texts

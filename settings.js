@@ -10,5 +10,8 @@ globalThis.MAIMEMO_DEFAULTS = Object.freeze({
   localTtsEnabled: true,
   localTtsPrefetch: true,
   localTtsVoice: 'af_heart',
-  localTtsSpeed: 1
+  localTtsSpeed: 1,
+  localTtsCacheEntries: 96,
+  localTtsCacheMinutes: 30,
+  localTtsIdleMinutes: 5
 });
