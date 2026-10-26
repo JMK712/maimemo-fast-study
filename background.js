@@ -22,6 +22,16 @@ chrome.runtime.onMessage.addListener((message, sender) => {
 });
 
 let localSecret;
+let wakePromise;
+async function wakeLocalService() {
+  if (!wakePromise) {
+    wakePromise = chrome.runtime.sendNativeMessage('com.maimemo.faststudy.wake', { action: 'wake' })
+      .then((response) => {
+        if (response?.ok !== true) throw new Error('Local TTS wake failed');
+      }).finally(() => { wakePromise = null; });
+  }
+  return wakePromise;
+}
 async function getLocalSecret() {
   if (localSecret) return localSecret;
   const response = await fetch(chrome.runtime.getURL('local-secret.json'));
@@ -60,12 +70,21 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 18000);
     try {
-      const response = await fetch(`http://127.0.0.1:8765/v1/${prefetch ? 'prefetch' : 'speech'}`, {
+      const url = `http://127.0.0.1:8765/v1/${prefetch ? 'prefetch' : 'speech'}`;
+      const options = {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'X-MaiMemo-Token': await getLocalSecret() },
         body: JSON.stringify(prefetch ? { texts, voice, rate } : { text, voice, rate }),
         signal: controller.signal
-      });
+      };
+      let response;
+      try {
+        response = await fetch(url, options);
+      } catch (error) {
+        if (controller.signal.aborted) throw error;
+        await wakeLocalService();
+        response = await fetch(url, options);
+      }
       if (!response.ok) throw new Error(`Local TTS HTTP ${response.status}`);
       const payload = await response.json();
       if (prefetch) return { ok: payload.queued === true };

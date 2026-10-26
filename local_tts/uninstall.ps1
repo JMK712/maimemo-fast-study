@@ -1,4 +1,5 @@
 $ErrorActionPreference = 'Stop'
+& (Join-Path $PSScriptRoot 'unregister-wake-host.ps1')
 & (Join-Path $PSScriptRoot 'stop.ps1')
 $root = Join-Path $env:LOCALAPPDATA 'MaiMemoFastStudy'
 $expected = [System.IO.Path]::GetFullPath((Join-Path $env:LOCALAPPDATA 'MaiMemoFastStudy'))

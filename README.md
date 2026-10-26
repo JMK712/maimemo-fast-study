@@ -21,7 +21,7 @@
 
 ## 本机离线发音（可选）
 
-扩展在墨墨学习 iframe 中接管英文 `speechSynthesis.speak()`，把单词或整句发送给只绑定 `127.0.0.1:8765` 的本机服务。服务使用本地 Kokoro ONNX 模型；不会向云端发送文字或请求云端合成。原有的 `rate` 会乘以扩展里的“语速倍率”。墨墨按顺序朗读例句时，扩展在本机音频结束后触发原有的 `end` 事件，使下一句继续播放。中文发音仍走网页原实现。本机服务未安装、未运行、超时或播放失败时，自动使用网页原发音。
+扩展在墨墨学习 iframe 中接管英文 `speechSynthesis.speak()`，把单词或整句发送给只绑定 `127.0.0.1:8765` 的本机服务。服务使用本地 Kokoro ONNX 模型；不会向云端发送文字或请求云端合成。原有的 `rate` 会乘以扩展里的“语速倍率”。墨墨按顺序朗读例句时，扩展在本机音频结束后触发原有的 `end` 事件，使下一句继续播放。中文发音仍走网页原实现。服务未运行时扩展会尝试按需唤醒；未安装、唤醒失败、超时或播放失败时，自动使用网页原发音。
 
 默认开启“提前缓存当前单词的三条例句”。墨墨在载入单词卡时就提供完整例句，因此扩展会让本机服务提前合成；播放按钮按下时，若已完成合成，直接取内存缓存。下一张卡在提交当前单词后才返回，扩展在它到达时立即开始预生成，并优先处理第一句。首次模型加载也因此提前到卡片出现时。站点模块结构变化会使预缓存停用，但按键后的即时合成仍可使用。可在扩展设置中关闭预缓存，恢复首次发音时才加载模型的行为。
 
@@ -50,8 +50,8 @@
 ### 安装和启动（Windows）
 
 1. 安装 Python 3.12 或 [uv](https://docs.astral.sh/uv/)。安装时需要联网下载 Python 依赖及模型；**安装完成后的合成完全离线**。
-2. 在 PowerShell 中进入本扩展文件夹，运行 `powershell -ExecutionPolicy Bypass -File .\local_tts\install.ps1`。脚本下载并校验 Kokoro 模型，安装本机运行环境，生成随机配对令牌。模型存放在 `%LOCALAPPDATA%\MaiMemoFastStudy`，不会进入 Git 仓库。
-3. 运行 `powershell -ExecutionPolicy Bypass -File .\local_tts\start.ps1` 启动隐藏的本机服务。每次 Windows 重新启动后需要再次运行这一命令。
+2. 在 `chrome://extensions` 打开开发者模式，记下本扩展卡片上的 32 位 ID。在 PowerShell 中进入本扩展文件夹，运行 `powershell -ExecutionPolicy Bypass -File .\local_tts\install.ps1 -ExtensionId <扩展ID>`。脚本下载并校验 Kokoro 模型，安装本机运行环境，生成随机配对令牌，并注册只接受该扩展调用的本机唤醒程序。模型存放在 `%LOCALAPPDATA%\MaiMemoFastStudy`，不会进入 Git 仓库。
+3. 首次发音或预缓存请求会唤醒本机服务；空闲约 5 分钟后服务退出。登录 Windows 时不会启动 Python。若扩展 ID 变化，运行 `powershell -ExecutionPolicy Bypass -File .\local_tts\register-wake-host.ps1 -ExtensionId <新扩展ID>` 更新配对。
 4. 在 `chrome://extensions` 加载本扩展文件夹；如果已经加载，点“重新加载”，再刷新墨墨学习页。保持设置中的“使用本机 Kokoro 发音”开启。
 
 若 Python 3.12 不是系统默认解释器，可给安装脚本传入路径：`powershell -ExecutionPolicy Bypass -File .\local_tts\install.ps1 -PythonPath 'C:\path\to\python.exe'`。
@@ -60,5 +60,6 @@
 
 ### 停止和卸载
 
-- 暂停离线发音：关闭扩展设置中的“使用本机 Kokoro 发音”，或运行 `powershell -ExecutionPolicy Bypass -File .\local_tts\stop.ps1`。下一次 Web Speech 请求会回退到原发音。
+- 暂停离线发音：关闭扩展设置中的“使用本机 Kokoro 发音”，下一次 Web Speech 请求会回退到原发音。`powershell -ExecutionPolicy Bypass -File .\local_tts\stop.ps1` 只会立即停止当前服务；下次发音或预缓存时仍会按需唤醒。
+- 关闭按需唤醒：运行 `powershell -ExecutionPolicy Bypass -File .\local_tts\unregister-wake-host.ps1`。这不会停止当前服务；`stop.ps1` 可立即停止服务。要恢复时运行 `register-wake-host.ps1 -ExtensionId <扩展ID>`。
 - 删除模型、运行环境与配对令牌：运行 `powershell -ExecutionPolicy Bypass -File .\local_tts\uninstall.ps1`。随后如需移除扩展，在 `chrome://extensions` 点击“移除”。

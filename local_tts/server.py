@@ -15,7 +15,8 @@ from functools import lru_cache
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
-PORT = 8765
+PORT = int(os.environ.get('MAIMEMO_TTS_PORT', '8765'))
+IDLE_SECONDS = int(os.environ.get('MAIMEMO_TTS_IDLE_SECONDS', '300'))
 VOICES = frozenset({'af_heart', 'af_bella', 'af_sarah', 'am_michael'})
 DATA_DIR = Path(os.environ.get('MAIMEMO_TTS_HOME', Path.home() / 'AppData/Local/MaiMemoFastStudy'))
 SECRET_FILE = DATA_DIR / 'secret.txt'
@@ -33,6 +34,7 @@ _prefetch_third_played = False
 _third_use_score = 0.25
 _inflight = {}
 _inflight_lock = threading.Lock()
+_last_activity = time.monotonic()
 
 
 @lru_cache(maxsize=96)
@@ -135,6 +137,8 @@ class Handler(BaseHTTPRequestHandler):
         return bool(expected) and hmac.compare_digest(expected, supplied)
 
     def do_POST(self):
+        global _last_activity
+        _last_activity = time.monotonic()
         global _prefetch_generation, _interactive_waiters, _prefetch_signature
         global _prefetch_texts, _prefetch_second_played, _prefetch_third_played, _third_use_score
         if self.path not in ('/v1/speech', '/v1/prefetch'):
@@ -206,5 +210,12 @@ if __name__ == '__main__':
     if not SECRET_FILE.is_file() or not MODEL_FILE.is_file() or not VOICES_FILE.is_file():
         raise SystemExit('Run install.ps1 first; model files or local token are missing.')
     server = ThreadingHTTPServer(('127.0.0.1', PORT), Handler)
+    def stop_when_idle():
+        while True:
+            time.sleep(15)
+            if time.monotonic() - _last_activity >= IDLE_SECONDS and not _model_lock.locked():
+                server.shutdown()
+                return
+    threading.Thread(target=stop_when_idle, daemon=True).start()
     print(f'Local speech service listening on 127.0.0.1:{PORT}', flush=True)
     server.serve_forever()

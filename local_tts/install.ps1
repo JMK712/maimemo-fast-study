@@ -1,4 +1,4 @@
-param([string]$PythonPath)
+param([string]$PythonPath, [string]$ExtensionId)
 $ErrorActionPreference = 'Stop'
 $root = Join-Path $env:LOCALAPPDATA 'MaiMemoFastStudy'
 $models = Join-Path $root 'models'
@@ -50,4 +50,5 @@ if (-not (Test-Path -LiteralPath $tokenFile)) {
 $token = [System.IO.File]::ReadAllText($tokenFile).Trim()
 @{ token = $token } | ConvertTo-Json -Compress | Set-Content -LiteralPath (Join-Path $extension 'local-secret.json') -NoNewline -Encoding ascii
 Write-Host "Installed offline model and local token in $root"
-Write-Host 'Reload the unpacked Chrome extension, then run local_tts\start.ps1.'
+if ($ExtensionId) { & (Join-Path $PSScriptRoot 'register-wake-host.ps1') -ExtensionId $ExtensionId }
+Write-Host 'Reload the unpacked Chrome extension. If no ExtensionId was supplied, register the wake host separately.'
