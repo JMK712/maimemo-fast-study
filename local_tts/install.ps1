@@ -49,6 +49,10 @@ if (-not (Test-Path -LiteralPath $tokenFile)) {
 }
 $token = [System.IO.File]::ReadAllText($tokenFile).Trim()
 @{ token = $token } | ConvertTo-Json -Compress | Set-Content -LiteralPath (Join-Path $extension 'local-secret.json') -NoNewline -Encoding ascii
+$service = Join-Path $root 'service'
+New-Item -ItemType Directory -Path $service -Force | Out-Null
+Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'server.py') -Destination $service -Force
+Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'start.ps1') -Destination $service -Force
 Write-Host "Installed offline model and local token in $root"
 if ($ExtensionId) { & (Join-Path $PSScriptRoot 'register-wake-host.ps1') -ExtensionId $ExtensionId }
 Write-Host 'Reload the unpacked Chrome extension. If no ExtensionId was supplied, register the wake host separately.'

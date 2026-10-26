@@ -4,7 +4,7 @@ $python = Join-Path $root '.venv\Scripts\python.exe'
 $pythonw = Join-Path $root '.venv\Scripts\pythonw.exe'
 $server = Join-Path $PSScriptRoot 'server.py'
 $pidFile = Join-Path $root 'server.pid'
-if (-not (Test-Path -LiteralPath $python)) { throw 'Run install.ps1 first.' }
+if (-not (Test-Path -LiteralPath $pythonw)) { throw 'Run install.ps1 first.' }
 if (Test-Path -LiteralPath $pidFile) {
   $oldId = [int](Get-Content -LiteralPath $pidFile)
   $old = Get-CimInstance Win32_Process -Filter "ProcessId = $oldId" -ErrorAction SilentlyContinue
@@ -13,6 +13,6 @@ if (Test-Path -LiteralPath $pidFile) {
     return
   }
 }
-$process = Start-Process -FilePath $python -ArgumentList @($server) -WorkingDirectory $PSScriptRoot -WindowStyle Hidden -PassThru
+$process = Start-Process -FilePath $pythonw -ArgumentList @($server) -WorkingDirectory $PSScriptRoot -WindowStyle Hidden -PassThru
 Set-Content -LiteralPath $pidFile -Value $process.Id -NoNewline
 Write-Host "Started local speech service (PID $($process.Id))."

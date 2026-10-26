@@ -1,4 +1,8 @@
 $ErrorActionPreference = 'Stop'
+$originalLauncher = Join-Path $env:LOCALAPPDATA 'MaiMemoFastStudy\service\MOMO.original.lnk'
+if (Test-Path -LiteralPath $originalLauncher) {
+  & (Join-Path $PSScriptRoot 'uninstall-launcher.ps1')
+}
 & (Join-Path $PSScriptRoot 'unregister-wake-host.ps1')
 & (Join-Path $PSScriptRoot 'stop.ps1')
 $root = Join-Path $env:LOCALAPPDATA 'MaiMemoFastStudy'
