@@ -56,7 +56,7 @@
 3. 首次发音或预缓存请求会唤醒本机服务；空闲约 5 分钟后服务退出。登录 Windows 时不会启动 Python。若扩展 ID 变化，运行 `powershell -ExecutionPolicy Bypass -File .\local_tts\register-wake-host.ps1 -ExtensionId <新扩展ID>` 更新配对。
 4. 在 `chrome://extensions` 加载本扩展文件夹；如果已经加载，点“重新加载”，再刷新墨墨学习页。保持设置中的“使用本机 Kokoro 发音”开启。
 
-如果 Chrome 报“找不到本机消息宿主”，可运行 `powershell -ExecutionPolicy Bypass -File .\local_tts\install-launcher.ps1`。它会备份桌面上的 `MOMO.lnk`，再将这个 Chrome 网页应用快捷方式改为：点击时先启动本机发音服务，再打开原来的墨墨网页应用。模型仍在首次发音时加载，服务仍按设置的空闲时间退出。直接从 Chrome 打开学习页时，这条快捷方式不会运行；若 Chrome 的本机消息仍不可用，请从 `MOMO` 启动。原快捷方式备份位于 `%LOCALAPPDATA%\MaiMemoFastStudy\service\MOMO.original.lnk`，可用 `powershell -ExecutionPolicy Bypass -File .\local_tts\uninstall-launcher.ps1` 恢复。此备用启动方式不修改安卓应用快捷方式 `墨墨背单词.lnk`。
+如果 Chrome 报“找不到本机消息宿主”，可运行 `powershell -ExecutionPolicy Bypass -File .\local_tts\install-launcher.ps1`。它会备份并更新桌面 `MOMO`、桌面“墨墨背单词”和开始菜单“墨墨”快捷方式，改由无命令行窗口的本机启动程序先拉起离线发音服务，再打开 Chrome 网页应用。原“墨墨背单词”快捷方式指向的旧安卓启动脚本已不存在。启动记录保存在 `%LOCALAPPDATA%\MaiMemoFastStudy\service\launcher.log`，方便排查。模型仍在首次发音时加载，服务仍按设置的空闲时间退出。直接从 Chrome 打开学习页时，这些快捷方式不会运行；若 Chrome 的本机消息仍不可用，请从已更新的墨墨快捷方式启动。运行 `powershell -ExecutionPolicy Bypass -File .\local_tts\uninstall-launcher.ps1` 可恢复原快捷方式。
 
 若 Python 3.12 不是系统默认解释器，可给安装脚本传入路径：`powershell -ExecutionPolicy Bypass -File .\local_tts\install.ps1 -PythonPath 'C:\path\to\python.exe'`。
 
@@ -66,5 +66,5 @@
 
 - 暂停离线发音：关闭扩展设置中的“使用本机 Kokoro 发音”，下一次 Web Speech 请求会回退到原发音。`powershell -ExecutionPolicy Bypass -File .\local_tts\stop.ps1` 只会立即停止当前服务；下次发音或预缓存时仍会按需唤醒。
 - 关闭按需唤醒：运行 `powershell -ExecutionPolicy Bypass -File .\local_tts\unregister-wake-host.ps1`。这不会停止当前服务；`stop.ps1` 可立即停止服务。要恢复时运行 `register-wake-host.ps1 -ExtensionId <扩展ID>`。
-- 恢复桌面 `MOMO` 原快捷方式：运行 `powershell -ExecutionPolicy Bypass -File .\local_tts\uninstall-launcher.ps1`。完整卸载也会先尝试恢复这个快捷方式。
+- 恢复墨墨原快捷方式：运行 `powershell -ExecutionPolicy Bypass -File .\local_tts\uninstall-launcher.ps1`。完整卸载也会先尝试恢复这些快捷方式。
 - 删除模型、运行环境与配对令牌：运行 `powershell -ExecutionPolicy Bypass -File .\local_tts\uninstall.ps1`。随后如需移除扩展，在 `chrome://extensions` 点击“移除”。
