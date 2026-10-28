@@ -57,13 +57,24 @@ internal static class Launcher
                 if (!File.Exists(python) || !File.Exists(server))
                     throw new FileNotFoundException("Local speech service is not installed.");
                 var info = new ProcessStartInfo(python, "\"" + server + "\"");
-                info.UseShellExecute = false;
-                info.CreateNoWindow = true;
+                info.UseShellExecute = true;
+                info.WindowStyle = ProcessWindowStyle.Hidden;
                 info.WorkingDirectory = service;
                 var process = Process.Start(info);
                 if (process == null) throw new InvalidOperationException("Could not start Python.");
                 File.WriteAllText(Path.Combine(root, "server.pid"), process.Id.ToString());
                 Log("Speech process started (PID " + process.Id + ").");
+                for (int i = 0; i < 60; i++)
+                {
+                    if (Listening())
+                    {
+                        Log("Speech service listening.");
+                        return;
+                    }
+                    if (process.HasExited) break;
+                    Thread.Sleep(100);
+                }
+                throw new InvalidOperationException("Speech process did not start listening.");
             }
             finally { mutex.ReleaseMutex(); }
         }
