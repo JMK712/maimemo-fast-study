@@ -71,10 +71,11 @@ internal static class Launcher
                         Log("Speech service listening.");
                         return;
                     }
-                    if (process.HasExited) break;
+                    if (process.HasExited)
+                        throw new InvalidOperationException("Speech process exited with code " + process.ExitCode + ".");
                     Thread.Sleep(100);
                 }
-                throw new InvalidOperationException("Speech process did not start listening.");
+                throw new InvalidOperationException("Speech process did not start listening after six seconds.");
             }
             finally { mutex.ReleaseMutex(); }
         }

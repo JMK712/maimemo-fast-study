@@ -22,7 +22,7 @@ MAX_CACHE_BYTES = 64 * 1024 * 1024
 CACHE_MINUTES = frozenset({5, 15, 30, 60})
 IDLE_MINUTES = frozenset({1, 5, 15, 30})
 VOICES = frozenset({'af_heart', 'af_bella', 'af_sarah', 'am_michael'})
-DATA_DIR = Path(os.environ.get('MAIMEMO_TTS_HOME', Path.home() / 'AppData/Local/MaiMemoFastStudy'))
+DATA_DIR = Path(os.environ.get('MAIMEMO_TTS_HOME', Path(__file__).resolve().parent.parent))
 SECRET_FILE = DATA_DIR / 'secret.txt'
 MODEL_FILE = DATA_DIR / 'models/kokoro-v1.0.onnx'
 VOICES_FILE = DATA_DIR / 'models/voices-v1.0.bin'
@@ -294,9 +294,9 @@ class Handler(BaseHTTPRequestHandler):
         self._reply(200, {'audio': audio})
 
 
-if __name__ == '__main__':
+def main():
     if not SECRET_FILE.is_file() or not MODEL_FILE.is_file() or not VOICES_FILE.is_file():
-        raise SystemExit('Run install.ps1 first; model files or local token are missing.')
+        raise SystemExit(f'Model files or local token are missing under {DATA_DIR}. Run install.ps1 first.')
     server = ThreadingHTTPServer(('127.0.0.1', PORT), Handler)
     def stop_when_idle():
         while True:
@@ -307,3 +307,14 @@ if __name__ == '__main__':
     threading.Thread(target=stop_when_idle, daemon=True).start()
     print(f'Local speech service listening on 127.0.0.1:{PORT}', flush=True)
     server.serve_forever()
+
+
+if __name__ == '__main__':
+    try:
+        main()
+    except BaseException:
+        import traceback
+        with (Path(__file__).with_name('startup-error.log')).open('a', encoding='utf-8') as log:
+            log.write(f'{time.strftime("%Y-%m-%d %H:%M:%S")}\n')
+            traceback.print_exc(file=log)
+        raise
